@@ -1,6 +1,7 @@
 ---
 title: "Time Series Analysis of Climate Data"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
 ---
