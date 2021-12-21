@@ -1,6 +1,8 @@
 ---
 title: "Time Series Analysis of Climate Data"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r, message=FALSE}
@@ -40,27 +42,371 @@ plot(as.ts(co2[324:360]), ylab = "CO2 levels", xlab = "Time since January 2015",
 
 The graph of the last three years suggests that there is a peak in CO2 levels every year around the 6th month i.e. June and a drop in CO2 levels around October i.e. the 10th month.
 
+We start by fitting a model only using time. The model that we have built is: CO2 = 347 + 0.158(time). This model explains large amount of the variability in the Hawaii CO2. It explains 97.5% of the variablity as shown by the value of R^2.
+
+```{r}
+modT=lm(CO2~t,data=CO2Hawaii)
+summary(modT)
+```
+
+```{r}
+plot(modT, which = 1)
+```
+
+There is clearly a quadratic pattern in the models residuals. Hence the model did not capture the trend correctly given that there is a clear pattern in the residuals.
+
+```{r}
+modTQ=lm(CO2~t+I(t^2),data=CO2Hawaii)
+summary(modTQ)
+plot(modTQ, which = 1)
+```
+
+The quadratic model fits very well. It has a 98.2% R-Squared. The quadratic term is significant, along with all other terms in the model so it seems to be helping compared to the other model. The model with the quadratic term does not have a pattern in the residuals vs fitted graph.
+
+The simple linear model has a clear pattern in residuals, while the quadratic model appears to be much better given that there is either no pattern, or only a very slight up and down pattern. 
+
+```{r}
+plot(as.ts(modT$residuals))
+plot(as.ts(modTQ$residuals))
+```
+
+Now it's time to work on possible seasonal trends in the series. Assume from now on that a quadratic model in t will account for the overall increasing trend. Here we decide between a cosine trend model and seasonal means for handling the seasonal pattern.
+
+We will next explore several models. We will create a cosine model, a model that takes into account seasonality. First we create a cosine model:
+
+```{r}
+CO2Hawaii$Xcos=cos(2*pi*CO2Hawaii$t/12)
+CO2Hawaii$Xsin=sin(2*pi*CO2Hawaii$t/12)
+
+modCos=lm(CO2~Xcos+Xsin+t+I(t^2),data=CO2Hawaii)
+summary(modCos)
+```
+
+The adjusted Rsquared for the cosine model is very high. It explains 99.8% of the variability in the model and all the variables are significant. Next we will fit a seasonal model that also includes a quadratic trend:
+
+```{r}
+modseason=lm(CO2~as.factor(Month)+t+I(t^2),data=CO2Hawaii)
+summary(modseason)
+```
+
+The adjusted R-squared for this model is slightly higher than the cosine trend model. This model explains 99.9% of the variability in the model.
 
 
+### Prediction and Model Comparisons
+
+Next we will compare models by making a prediction for Octover 2018 (t = 370).
+
+```{r}
+fun1 <- makeFun(modT)
+fun2 <- makeFun(modTQ)
+fun3 <- makeFun(modCos)
+fun4 <- makeFun(modseason)
+
+fun1(t = 370)
+fun2(t = 370)
+fun3(cos(2*pi*370/12),sin(2*pi*370/12),370)
+fun4(10,t = 370)
+```
+
+The simplest model predicts a value of 406 for October 2018. The quadratic model predicts a value of 410 for October 2018. The cosine model predicts a value of 407 for October 2018. The season model predicts a value of 406 for October 2018.
+
+```{r}
+AIC(modCos)
+AIC(modseason)
+```
+
+The seasonal model has a significantly lower AIC. That is one reason we might prefer the seasonality model. Another reason we might prefer the seasonal model is that it has a higher R-squared, which means that the seasonal model explains more of the variability in CO2 that the cosine model does.
+
+Since 2017 was in the past, we can actually see how each of these two models did in terms of prediction. In the same folder as this lab, there is an Excel spreadsheet (also saved as a CSV file) called **HawaiiCO2monthlyData** that I downloaded in 2021. It includes a column for CO2 values, that I have highlighted, whose values closely match those in **CO2Hawaii** (they are only different due to round off error and later data correction). 
+
+```{r}
+real2018 = c(407.98,
+408.36,
+409.21,
+410.24,
+411.23,
+410.81,
+408.83,
+407.02,
+405.52,
+405.93,
+408.04,
+409.17)
+```
+
+```{r}
+cos2018 <- c(fun3(cos(2*pi*361/12),sin(2*pi*361/12),361), fun3(cos(2*pi*362/12),sin(2*pi*362/12),362), fun3(cos(2*pi*363/12),sin(2*pi*363/12),363), fun3(cos(2*pi*364/12),sin(2*pi*364/12),364), fun3(cos(2*pi*365/12),sin(2*pi*365/12),365), fun3(cos(2*pi*366/12),sin(2*pi*366/12),366), fun3(cos(2*pi*367/12),sin(2*pi*367/12),367), fun3(cos(2*pi*368/12),sin(2*pi*368/12),368), fun3(cos(2*pi*369/12),sin(2*pi*369/12),369), fun3(cos(2*pi*370/12),sin(2*pi*370/12),370), fun3(cos(2*pi*371/12),sin(2*pi*371/12),371), fun3(cos(2*pi*372/12),sin(2*pi*372/12),372))
+
+seasons2018 <- fun4(c(1:12), t = c(361:372))
+
+(cor(real2018, cos2018))^2
+(cor(real2018, seasons2018))^2
+
+```
+
+The seasonal model was much better at predicting the 2018 values. The R^2 was 97.1% for the seasonal model compared to 79.2% for the cosine model.The seasonal model also gave a slightly better prediction for October 2018.
 
 
+Now let us look if we need the quadratic term in our model. We will also look to see how well a model with only seasonality is.
+
+```{r}
+modseason2=lm(CO2~as.factor(Month),data=CO2Hawaii)
+summary(modseason2)
+```
+
+```{r}
+season2fit <- ts(data.frame(co2, modseason$fitted))
+plot(season2fit,plot.type="s",lwd=3,col=c("red","purple"),ylab="CO2 levels",main="CO2 levels with seasonal fit (modseason)")
+
+season2fit <- ts(data.frame(co2, modseason2$fitted))
+plot(season2fit,plot.type="s",lwd=3,col=c("red","purple"),ylab="CO2 levels",main="CO2 levels with seasonal fit (modseason2)")
+```
+We think that you do need to include the quadratic term. The model with the quadratic has a higher R-Squared. Similar to that, graphically, it appears to better fit the data. Clearly only seasonaility does not do a good job at prediction as can be seen by the graph above.
 
 
+We first need to check the models conditions. We will make an ACF and PACF of the residuals of the best model we chose above (including both seasonality and trend), then fit the simplest ARIMA model that deals with any autocorrelation issues. Differencing is not required, since we already dealt with the trend via the quadratic term above. There is a function called *auto.arima* where we give it a data set (like `auto.arima(CO2Hawaii$CO2)`) and it gives you the best ARIMA model possible. In the case of this data, *auto.arima* suggests an ARIMA(2,0,1) model, but actually we can get one even simpler than this and still fixes autocorrelation issues.
+
+```{r}
+par(mfrow=c(2,2))
+acf(modseason$residuals)
+pacf(modseason$residuals)
+
+mod200 = Arima(modseason$residuals,order=c(2,0,0))
+
+acf(mod200$residuals)
+pacf(mod200$residuals)
+Box.test(mod200$residuals, type = "Ljung-Box")
+adf.test(mod200$residuals)
 
 
+coeftest(mod200)
+```
+
+This model is significant. All of the variables inside this AR model are signifiant. This model has dealt with the autocorrelation issues. Both the ACF and PACF graph are acceptable, and the models residuals have passed both the Box-Ljung test and the Augmented Dickey-Fuller Test.
+
+Above, we fit an ARIMA model to the residuals of the previous best model. We will run diagnostics on this ARIMA and explain what they mean. We make an ACF of the residuals of the ARIMA model then write a sentence to justify that there is no autocorrelation left. 
+
+```{r,message=F,warning=F}
+acf(mod200$residuals)
+Box.test(mod200$residuals, type = "Ljung-Box")
+
+tsdiag(mod200)
+```
+
+```{r}
+adf.test(modseason$residuals)
+Box.test(modseason$residuals, type = "Ljung-Box")
+adf.test(mod200$residuals)
+```
+
+Our ARIMA model has stationary residuals. We know this based on two things. First, our model has passed the Box-Ljung test, and our ACF plot does not show any concerning correlation. Both the AR model and the non AR model passed the Dickey Fuller test, however, the non AR model failed the Box-Ljung test which shows that the data is not stationary.
 
 
+We need to update our forecasts. We will use your ARIMA model to forecast ahead 12 periods, then add those forecasts to the best forecasts you had before, and compare to the real2018 data.
+
+```{r}
+pred5=forecast(mod200,h=12)
+fun1 <- makeFun(modseason)
+ft0 = fun1(t = c(361:372), Month = c(1:12))
+pred5list <- c(0.0638,0.0681, 0.0577, 0.0519, 0.0458, 0.0406, 0.0358, 0.0316, 0.0277, 0.0243, 0.0213, 0.0185)
+
+forecastedvalue = ft0 + pred5list
+
+cor(forecastedvalue, real2018)^2
+
+```
+
+Our model explains 97.1% of the variability in 2018 Co2 levels.
 
 
+We check normality for the residuals of both our quadratic seasonal model and your ARIMA model (based on the residuals of the quadratic seasonal model), both by eye and with the Shapiro-Wilk test. 
 
+```{r}
+plot(modseason, which = 2)
+shapiro.test(modseason$residuals)
 
+qqnorm(mod200$residuals)
+shapiro.test(mod200$residuals)
+```
 
+We found that the non-ARIMA model did not have normal residuals. On the qqplot you could see that the tails were problematic, but otherwise the qqplot looked good. However, the Shapiro Wilk test also showed that the residuals were not normal. It is understood that the Shapiro Wilk Test has an issue when the sample size is too large, so we will proceed cautiously. The ARIMA model had a much better looking qqplot, and it passed the Shapiro Wilk Test.
 
+By now we can see that we cannot make forecast intervals for the model that fails the conditions. We will instead use the ARIMA forecast to make our intervals.
 
+We will use the *predict* function to create a 95% prediction interval for January, 2018. When applied to an ARIMA model, the *predict* function yields a data frame including *pred* (that's our g(t)) and *se* (your standard error). 
 
+```{r}
+gt = predict(mod200, n.ahead = 1)
+ft = fun1(t = 361, Month = 1)
+ft+gt$pred[1]-(1.96*gt$se[1])
+ft+gt$pred[1]+(1.96*gt$se[1])
+```
 
+The actual value for January  of 2018 is within our prediction interval.
 
+We will predict a full year ahead, and then plot the CO2 time series (in blue), the prediction (in red), and the upper and lower bounds (in orange). 
 
+```{r}
+co2.pred<-predict(mod200,n.ahead=12)
+ft2 = fun1(t = c(361:372), Month = c(1:12))
 
+plot(co2,xlim=c(0,375),ylim=c(350,420), xlab = "Months Since January 1988", ylab = "Levels of CO2 in the Atmosphere", main = "Level of CO2 in the Atmosphere Over Time", col = "blue")
+lines((ft2+co2.pred$pred),col="red")
+# Confidence interval
+lines((ft2+co2.pred$pred)+1.96*co2.pred$se,col="orange",lty=3)
+lines((ft2+co2.pred$pred)-1.96*co2.pred$se,col="orange",lty=3)
+```
+We will "Zoom in" on your plot above, to give a plot of just the past three years and our forecast (same colors) for the next year.  
 
+```{r}
+co2.pred<-predict(mod200,n.ahead=12)
+ft3 = fun1(t = c(361:372), Month = c(1:12))
 
+bestpred = ft3+co2.pred$pred
+
+bestpred2 = c(407, bestpred)
+
+sets = c(0,co2.pred$se)
+
+plot(co2,xlim=c(325,375),ylim=c(380,420), xlab = "Months Since January 2015", ylab = "Levels of CO2 in the Atmosphere", main = "Level of CO2 in the Atmosphere Over Time", col = "blue")
+#co2.pred<-predict(mod200,n.ahead=12)
+lines(ts(bestpred2, start = 360),col="red")
+# Confidence interval
+lines(ts(bestpred2, start = 360)+1.96*sets,col="orange",lty=3)
+lines(ts(bestpred2, start = 360)-1.96*sets,col="orange",lty=3)
+```
+
+## Full ARIMA
+
+An alternative way to model the CO2 data, rather than a model looking like y = TREND + SEASONALITY + ARIMA + ERRORS would be a pure ARIMA model. Of course, because CO2 is going up over time, this ARIMA would need to have differencing. We will build an ARIMA model below that has differencing.
+
+```{r}
+layout(matrix(c(1,1,2,3),2,2,byrow=TRUE))
+plot.ts(co2);acf(co2,main='Auto-Corr');pacf(co2,main='Part-Corr')
+```
+Since this has a trend we will try differencing to account for this.
+
+```{r}
+mod010 <- Arima(co2,order=c(0,1,0))
+plot(mod010$residuals)
+adf.test(mod010$residuals)
+```
+This was enough to fix the lack of stationary. We will now check the independence on the past.
+
+```{r}
+acf(mod010$residuals)
+pacf(mod010$residuals)
+```
+We will try an ARIMA (2,1,0) to account for lags.
+```{r}
+mod210 <- Arima(co2,order=c(2,1,0))
+acf(mod210$residuals)
+pacf(mod210$residuals)
+```
+
+```{r}
+mod211 <- Arima(co2,order=c(2,1,1))
+acf(mod211$residuals)
+pacf(mod211$residuals)
+coeftest(mod211)
+summary(mod211)
+```
+
+All of the variables in our ARIMA(2,1,1) are significant. We will now check to see if anything additional is needed.
+
+```{r}
+mod311 <- Arima(co2,order=c(3,1,1))
+acf(mod311$residuals)
+pacf(mod311$residuals)
+coeftest(mod311)
+summary(mod311)
+```
+The ar3 coefficient in ARIMA (3,1,1) is not significant. ARIMA (3,1,1) also has a slightly higher sigma^2 and AIC. Now we will try an ARIMA (2,1,2) to see if that is better for us.
+
+```{r}
+mod212 <- Arima(co2,order=c(2,1,2))
+acf(mod212$residuals)
+pacf(mod212$residuals)
+coeftest(mod212)
+summary(mod212)
+```
+
+AIRMA(2,1,2) has a much higher AIC and a slightly higher sigma^2 than our best model ARIMA(2,1,1). Although our ARIMA(2,1,1) is not perfect it appears to be better than any other ARIMA model that we can build at this time. The differences that we chose to do for both AIRMA and SARIMA were both 1 (SARIMA had a period of 12) (See further SARIMA Analysis below).
+
+We will confirm using *auto.arima* that we got the regular differencing right (i.e., the best possible d). Then, by looking at the ACF of the residuals, we will explain why seasonal differencing is definitely required.
+```{r}
+auto.arima(co2)
+bestmod <- Arima(co2,order=c(2,1,1))
+acf(bestmod$residuals)
+```
+There appears to be a clear lag at intervals. To account we will want to do a SARIMA model with differencing. We will try that below.
+
+We will finish fitting the best SARIMA we can, using AR, MA, SAR, and SMA terms. 
+
+```{r}
+mod211010 <- Arima(co2,order=c(2,1,1),seasonal = list(order=c(1,1,2),period=12))
+acf(mod211010$residuals)
+pacf(mod211010$residuals)
+
+season3fit <- ts(data.frame(co2, mod211010$fitted))
+plot(season3fit,plot.type="s",lwd=3,col=c("red","purple"),ylab="CO2 levels",main="CO2 levels with SARIMA Model")
+```
+
+```{r}
+#Using auto.arima to check our work
+co222 = ts(CO2Hawaii$CO2, frequency = 12)
+asarima = auto.arima(co222, seasonal = T)
+
+summary(asarima)
+
+season4fit <- ts(data.frame(co2, asarima$fitted))
+plot(season4fit,plot.type="s",lwd=3,col=c("red","purple"),ylab="CO2 levels",main="CO2 levels with Auto SARIMA Model")
+```
+
+The SARIMA model that we came up that we came up with was SARIMA (2,1,1)x(1,1,2)[12]. The model that auto.arima came up with was slightly different; (1, 1, 2)x(1, 1, 2)[12]. However, the two models have the same AIC and sigma^2. Therefore, we will use the model we made since it seems to be as good as the best model suggested by auto.arima.
+
+We will use our SARIMA model to forecast all 12 months in 2018 and report the R^2 with the real data from 2018. We will then make a plot with the CO2 time series (in blue), the forecast (in red), and the forecast interval (in orange).
+
+```{r}
+pred6 <- forecast(mod211010, h=12)
+
+cor(real2018, pred6$mean)^2
+```
+```{r}
+pred7 <- predict(mod211010, n.ahead=12)
+
+bestpred = c(407, pred7$pred)
+
+sets = c(0,pred7$se)
+
+plot(co2,xlim=c(0,375),ylim=c(350,420), xlab = "Months Since January 1988", ylab = "Levels of CO2 in the Atmosphere", main = "Level of CO2 in the Atmosphere Over Time", col = "blue")
+lines(ts(bestpred, start = 360),col="red")
+# Confidence interval
+lines(ts(bestpred, start = 360)+1.96*sets,col="orange",lty=3)
+lines(ts(bestpred, start = 360)-1.96*sets,col="orange",lty=3)
+```
+Before we can trust this interval we need to check that the residuals are normally distributed. The qqplot below shows that the residuals look roughly normal, so we can proceed with our forecasting.
+
+```{r}
+qqnorm(mod211010$residuals)
+```
+
+It appears as though both models explain roughly the same amount of variability in co2. We think that the time+seasonality+ARIMA model is better because it is simpler. We believe that this model is easier to understand because it puts more of an emphasis on time and seasonality which would be easier for someone in congress to understand. 
+
+```{r}
+pred6 <- forecast(mod211010, h=12)
+cor(real2018, pred6$mean)^2
+```
+```{r}
+co2.pred<-predict(mod200,n.ahead=12)
+
+ft3 = fun1(t = c(361:372), Month = c(1:12))
+
+bestpred = ft3+co2.pred$pred
+
+cor(real2018, bestpred)^2
+```
+
+## Conclusion
+
+It is clear that the amount of CO2 in the atmosphere is increasing overtime. There has been an increase of approximately 60 ppm in the last 30 years. This model suggests that there is an increase in co2 levels around spring/summer i.e. during the months of April and May while there seems to be a drop in co2 levels during the months of September/October i.e. during the fall. This would be an interesting trend to find reasons behind. We do however need to be concerned about co2 levels since all the models suggested a clear increase in co2 over time.
