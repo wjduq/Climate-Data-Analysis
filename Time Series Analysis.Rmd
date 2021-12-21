@@ -1,0 +1,66 @@
+---
+title: "Time Series Analysis of Climate Data"
+output: html_notebook
+---
+
+```{r, message=FALSE}
+require(mosaic)
+options(digits=3)
+palette = trellis.par.get()$superpose.symbol$col
+library(Stat2Data)
+library(forecast)
+library(lmtest) # if you want p-values for coefficients in ARIMA models
+library(tseries) # need for Augmented Dickey-Fuller test
+require(fBasics) # need for normality tests of residuals
+
+
+```
+
+### Climate Change
+
+The data in **CO2Hawaii** shows the monthly carbon dioxide level (CO2 in ppm) measured at the Mauna Loa Observatory in Hawaii from 1988 through 2017. 
+
+```{r}
+data("CO2Hawaii")
+head(CO2Hawaii)
+tail(CO2Hawaii)
+```
+
+We first start by creating a plot of our time series data. See plot below:
+```{r}
+class(CO2Hawaii)
+co2 = ts(CO2Hawaii$CO2)
+class(co2)
+```
+
+```{r}
+plot(co2, ylab = "CO2 levels", xlab = "Time since January 1988", main = "CO2 Levels", col = "blue")
+plot(as.ts(co2[324:360]), ylab = "CO2 levels", xlab = "Time since January 2015", main = "CO2 levels over the last 3 years in Hawaii", col = "blue")
+```
+
+The graph of the last three years suggests that there is a peak in CO2 levels every year around the 6th month i.e. June and a drop in CO2 levels around October i.e. the 10th month.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
