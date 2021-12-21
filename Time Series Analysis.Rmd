@@ -15,8 +15,6 @@ library(forecast)
 library(lmtest) # if you want p-values for coefficients in ARIMA models
 library(tseries) # need for Augmented Dickey-Fuller test
 require(fBasics) # need for normality tests of residuals
-
-
 ```
 
 ### Climate Change
@@ -118,7 +116,7 @@ AIC(modseason)
 
 The seasonal model has a significantly lower AIC. That is one reason we might prefer the seasonality model. Another reason we might prefer the seasonal model is that it has a higher R-squared, which means that the seasonal model explains more of the variability in CO2 that the cosine model does.
 
-Since 2017 was in the past, we can actually see how each of these two models did in terms of prediction. In the same folder as this lab, there is an Excel spreadsheet (also saved as a CSV file) called **HawaiiCO2monthlyData** that I downloaded in 2021. It includes a column for CO2 values, that I have highlighted, whose values closely match those in **CO2Hawaii** (they are only different due to round off error and later data correction). 
+Since 2017 was in the past, we can actually see how each of these two models did in terms of prediction. Below you can see the real values from 2018.
 
 ```{r}
 real2018 = c(407.98,
@@ -142,7 +140,6 @@ seasons2018 <- fun4(c(1:12), t = c(361:372))
 
 (cor(real2018, cos2018))^2
 (cor(real2018, seasons2018))^2
-
 ```
 
 The seasonal model was much better at predicting the 2018 values. The R^2 was 97.1% for the seasonal model compared to 79.2% for the cosine model.The seasonal model also gave a slightly better prediction for October 2018.
@@ -179,7 +176,6 @@ pacf(mod200$residuals)
 Box.test(mod200$residuals, type = "Ljung-Box")
 adf.test(mod200$residuals)
 
-
 coeftest(mod200)
 ```
 
@@ -214,7 +210,6 @@ pred5list <- c(0.0638,0.0681, 0.0577, 0.0519, 0.0458, 0.0406, 0.0358, 0.0316, 0.
 forecastedvalue = ft0 + pred5list
 
 cor(forecastedvalue, real2018)^2
-
 ```
 
 Our model explains 97.1% of the variability in 2018 Co2 levels.
